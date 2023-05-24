@@ -34,6 +34,32 @@ Anghami Bot is a Discord bot that allows you to play songs from Anghami and crea
 
 Contributions are welcome! If you have any suggestions, improvements, or bug fixes, feel free to open an issue or submit a pull request.
 
+## Bot Update to Beta 2.0
+### Changelog
+
+1- Added Skip Command
+
+2-Added Stop Command
+
+3-Fixed The song not playing till the end
+
+4-Show Now Playing Song
+
+### ToDo List
+1- Add More Commands {shuffle, Pause, Resume, Show Queue, Help }
+
+2- Fix Playing Wrong Song
+
+3- Improve stability
+
+4- Put it on my Could for 24/7 Online
+
+5- Improve discord embed message for commands
+
+6- Add .env 
+
+7- Support for docker 
+
 ## Disclaimer
 This project is for educational purposes only. The developers of this bot are not responsible for any misuse or illegal activities conducted with the bot. Please use the bot responsibly and respect the terms of service of Anghami and Discord.
 
