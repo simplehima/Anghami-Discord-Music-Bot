@@ -26,8 +26,8 @@ Anghami Bot is a Discord bot that allows you to play songs from Anghami and crea
 ## Usage
 
 1. Invite the bot to your Discord server.
-2. Run the bot using the following command:
-3. Use the following command to play songs from Anghami:
+2. Run the bot using the following command: `python bot.py`
+3. Use the following command to play songs from Anghami: `!play [Anghami playlist URL]`
 
 
 ## Contributing
