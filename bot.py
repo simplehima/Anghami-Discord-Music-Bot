@@ -76,22 +76,39 @@ async def play(ctx, url):
 
         for title in song_titles:
             song = Song(title)
-            audio_source = discord.FFmpegPCMAudio(song.info['url'])
+            audio_source = discord.FFmpegPCMAudio(song.info['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+            audio_source = discord.PCMVolumeTransformer(audio_source)
             ctx.voice_client.play(audio_source)
             await ctx.send(f'Now playing: {song.title} ({song.duration} seconds)')
 
             while ctx.voice_client.is_playing():
                 await asyncio.sleep(1)
 
+        await ctx.voice_client.disconnect()
+
     else:
         for title in song_titles:
             song = Song(title)
-            audio_source = discord.FFmpegPCMAudio(song.info['url'])
+            audio_source = discord.FFmpegPCMAudio(song.info['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+            audio_source = discord.PCMVolumeTransformer(audio_source)
             ctx.voice_client.play(audio_source)
             await ctx.send(f'Added to queue: {song.title} ({song.duration} seconds)')
 
             while ctx.voice_client.is_playing():
                 await asyncio.sleep(1)
 
+@bot.command()
+async def skip(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.stop()
+        await ctx.send("Skipped the current song.")
+
+@bot.command()
+async def stop(ctx):
+    if ctx.voice_client:
+        ctx.voice_client.stop()
+        await ctx.voice_client.disconnect()
+        await ctx.send("Stopped playback and cleared the queue.")
+        
 # Run the bot with your token
-bot.run('your bot token here')
+bot.run('Your Bot Token Here')
