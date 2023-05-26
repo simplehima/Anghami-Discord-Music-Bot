@@ -1,3 +1,4 @@
+import os
 import discord
 from discord.ext import commands
 import yt_dlp
@@ -8,9 +9,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import asyncio
+from dotenv import load_dotenv
 
+
+load_dotenv()
 intents = Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Set the bot's presence when ready
+@bot.event
+async def on_ready():
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="!help for commands 🤖"))
 
 ytdl_options = {
     'format': 'bestaudio/best',
@@ -100,7 +109,7 @@ async def play(ctx, url):
             embed.add_field(name="Duration", value=f"{song.duration} seconds", inline=True)
             await ctx.send(embed=embed)
 
-            while ctx.voice_client and ctx.voice_client.is_playing():
+            while ctx.voice_client and (ctx.voice_client.is_playing() or ctx.voice_client.is_paused()):
                 await asyncio.sleep(1)
 
         # Check if ctx.voice_client is not None before disconnecting
@@ -124,7 +133,7 @@ async def play(ctx, url):
             embed.add_field(name="Duration", value=f"{song.duration} seconds", inline=True)
             await ctx.send(embed=embed)
 
-            while ctx.voice_client and ctx.voice_client.is_playing():
+            while ctx.voice_client and (ctx.voice_client.is_playing() or ctx.voice_client.is_paused()):
                 await asyncio.sleep(1)
 
 @bot.command()
@@ -151,6 +160,41 @@ async def stop(ctx):
         embed = discord.Embed(title="Stopped playback and cleared the queue.", color=discord.Color.red())
         embed.set_image(url="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjNmNmExOWUzNGFmNmI4OGE5NjYwYzczMzU4NjkxNDA1NmZiY2YzZSZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/LX8sm3UPwCpjxleARL/giphy.gif")
         await ctx.send(embed=embed)
+
+@bot.command()
+async def pause(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
+        embed = discord.Embed(title="Paused playback.", color=discord.Color.orange())
+        embed.set_image(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
+        await ctx.send(embed=embed)
+
+@bot.command()
+async def resume(ctx):
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
+        embed = discord.Embed(title="Resumed playback.", color=discord.Color.green())
+        embed.set_image(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
+        await ctx.send(embed=embed)
         
+bot.remove_command('help')
+@bot.command()
+async def help(ctx):
+    embed = discord.Embed(title="Bot Commands", color=discord.Color.blue())
+    embed.set_thumbnail(url="https://media.tenor.com/AcrJynkiNzcAAAAM/cmd-command.gif")
+    embed.add_field(name="!play <url> 🎶", value="Play songs from the provided URL", inline=False)
+    embed.add_field(name="!skip ⏩", value="Skip the current song", inline=False)
+    embed.add_field(name="!stop ⏹️", value="Stop playback and clear the queue", inline=False)
+    embed.add_field(name="!pause ⏸️", value="Pause playback", inline=False)
+    embed.add_field(name="!resume ▶️", value="Resume playback", inline=False)
+    embed.set_footer(text="Made by Hima")
+    await ctx.send(embed=embed)
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        embed = discord.Embed(title="Oops! 😓", description="That's an invalid command. Please use !help to view all available commands.", color=discord.Color.red())
+        await ctx.send(embed=embed)
+
 # Run the bot with your token
-bot.run('Your Bot Token Here')
+bot.run(os.getenv('BOT_TOKEN'))
