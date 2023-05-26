@@ -34,7 +34,7 @@ Anghami Bot is a Discord bot that allows you to play songs from Anghami and crea
 
 Contributions are welcome! If you have any suggestions, improvements, or bug fixes, feel free to open an issue or submit a pull request.
 
-## Bot Update to Beta 2.0
+## Bot Update to Beta 2.5
 
 ### Changelog
 
