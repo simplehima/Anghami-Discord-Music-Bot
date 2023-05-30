@@ -3,15 +3,16 @@ import discord
 from discord.ext import commands
 import yt_dlp
 from discord import Intents
-from bs4 import BeautifulSoup
 import requests
+import re
 import asyncio
 from dotenv import load_dotenv
 
+load_dotenv()  # Load environment variables from .env file
 
-load_dotenv()
 intents = Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
+
 
 # Set the bot's presence when ready
 @bot.event
@@ -27,7 +28,24 @@ ytdl_options = {
     }],
 }
 yt_dlp.utils.bug_reports_message = lambda: ''
-queues = {}
+
+default_img = "https://media1.giphy.com/media/FpAzqWwF3LWSTtTyg4/giphy.gif"
+
+def extract_song_info(url):
+    response = requests.get(url)
+    html_content = response.text
+
+    pattern = r'{"@context":"http:\/\/schema.org\/","@type":"MusicRecording","name":"(.+?)","byArtist":{"@type":"MusicGroup","name":"(.+?)","@id":"(.+?)"},"inAlbum":{"@type":"MusicAlbum","name":"(.+?)","@id":"(.+?)"},'
+    matches = re.findall(pattern, html_content)
+
+    songs = []
+    for match in matches:
+        song_name = match[0]
+        artist_name = match[1]
+        album_name = match[3]
+        songs.append((song_name, artist_name, album_name))
+
+    return songs
 
 
 class Song:
@@ -37,156 +55,151 @@ class Song:
         self.duration = self.info['duration']
 
 
-def get_song_titles(url):
-    # Send a GET request to the URL
-    response = requests.get(url)
-
-    # Parse the HTML using Beautiful Soup
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    # Find the container element with the specified class
-    container = soup.find(class_='container-table100')
-
-    # Find all <span> elements with the specified attribute within the container
-    song_spans = container.find_all("span", attrs={"_ngcontent-anghami-web-v2-c202": ""})
-
-    # Extract and filter the song titles
-    song_titles = [span.text.strip() for span in song_spans if 'E' not in span.text]
-
-    return song_titles
-
-
-# Add a global variable to store the stop flag for each guild
-stop_flags = {}
-
-
 @bot.command()
 async def play(ctx, url):
-    global stop_flags
-    guild_id = ctx.guild.id
-
-    # Reset the stop flag for the guild when starting a new play command
-    stop_flags[guild_id] = False
-
-    song_titles = get_song_titles(url)
-    default_img = "https://media1.giphy.com/media/FpAzqWwF3LWSTtTyg4/giphy.gif"
+    playlist_songs = extract_song_info(url)
+    voice_channel = ctx.author.voice.channel
 
     if not ctx.voice_client:
-        voice_channel = ctx.author.voice.channel
         voice_client = await voice_channel.connect()
-        ctx.voice_client.stop()
-
-        for title in song_titles:
-            # Check if the stop flag has been set and break the loop
-            if stop_flags[guild_id]:
-                break
-
-            song = Song(title)
-            audio_source = discord.FFmpegPCMAudio(song.info['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
-            audio_source = discord.PCMVolumeTransformer(audio_source)
-            if ctx.voice_client:
-                ctx.voice_client.play(audio_source)
-
-            embed = discord.Embed(title=f"Now playing: {song.title}", color=discord.Color.blue())
-            embed.set_thumbnail(url=default_img)
-            embed.add_field(name="Duration", value=f"{song.duration} seconds", inline=True)
-            await ctx.send(embed=embed)
-
-            while ctx.voice_client and (ctx.voice_client.is_playing() or ctx.voice_client.is_paused()):
-                await asyncio.sleep(1)
-
-        # Check if ctx.voice_client is not None before disconnecting
-        if ctx.voice_client:
-            await ctx.voice_client.disconnect()
-
     else:
-        for title in song_titles:
-            # Check if the stop flag has been set and break the loop
-            if stop_flags[guild_id]:
+        voice_client = ctx.voice_client
+
+    if voice_client.is_playing():
+        await ctx.send("🎶 Bot is already playing audio.")
+        return
+
+    bot.stopped = False  # Flag to track if stop command was used
+    bot.skip = False  # Flag to track if skip command was used
+    bot.paused = False  # Flag to track if pause command was used
+
+    current_song_count = 1  # Track the current song count
+
+    async def play_song(song_info):
+        nonlocal current_song_count  # Access the current_song_count variable from the outer scope
+
+        if bot.stopped:
+            return  # Stop playing if stop command was used
+
+        song_name, artist_name, _ = song_info
+        song = Song(f'{song_name} {artist_name}')
+        audio_source = discord.FFmpegPCMAudio(song.info['url'])
+
+        if not voice_client.is_connected():
+            await voice_channel.connect()
+
+        voice_client.play(audio_source)
+
+        embed = discord.Embed(title="🎶 Now Playing 💓", description=f"**{song.title}** ({song.duration} seconds)", color=discord.Color.green())
+        embed.set_thumbnail(url=default_img)
+
+        if current_song_count == 1:
+            embed.add_field(name="Total Songs", value=str(len(playlist_songs)), inline=False)
+
+        message = await ctx.send(embed=embed)
+
+        while voice_client.is_playing():
+            if bot.skip:
+                voice_client.stop()
                 break
+            if bot.paused:
+                voice_client.pause()
+                while bot.paused:
+                    await asyncio.sleep(1)
+                voice_client.resume()
+            await asyncio.sleep(1)
 
-            song = Song(title)
-            audio_source = discord.FFmpegPCMAudio(song.info['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
-            audio_source = discord.PCMVolumeTransformer(audio_source)
-            if ctx.voice_client:
-                ctx.voice_client.play(audio_source)
+        if bot.stopped:
+            await voice_client.disconnect()
+        else:
+            await message.delete()
 
-            embed = discord.Embed(title=f"Added to queue: {song.title}", color=discord.Color.green())
-            embed.set_thumbnail(url=default_img)
-            embed.add_field(name="Duration", value=f"{song.duration} seconds", inline=True)
-            await ctx.send(embed=embed)
+        current_song_count += 1  # Increment the current song count
 
-            while ctx.voice_client and (ctx.voice_client.is_playing() or ctx.voice_client.is_paused()):
-                await asyncio.sleep(1)
+    for i, song_info in enumerate(playlist_songs):
+        await play_song(song_info)
 
+        if i < len(playlist_songs) - 1 and not bot.stopped:
+            await ctx.send(f"⏯️ Playing song {i+1}/{len(playlist_songs)}")  # Send the current song number and the total number of songs
 
-@bot.command()
-async def skip(ctx):
-    if ctx.voice_client and ctx.voice_client.is_playing():
-        ctx.voice_client.stop()
+        if bot.skip:
+            bot.skip = False
 
-        embed = discord.Embed(title="Skipped the current song.", color=discord.Color.red())
-        embed.set_image(url="https://media4.giphy.com/media/nVE8OaIGkUhf7rkieR/giphy.gif?cid=ecf05e47bfmg4e4soz8txfcuqmq7h97v58n9xqakuyqnhxrk&ep=v1_gifs_search&rid=giphy.gif&ct=g")
-        await ctx.send(embed=embed)
+    if not bot.stopped:
+        await voice_client.disconnect()
 
 
 @bot.command()
 async def stop(ctx):
-    global stop_flags
-    guild_id = ctx.guild.id
+    voice_client = ctx.voice_client
 
-    if ctx.voice_client:
-        # Set the stop flag for the guild
-        stop_flags[guild_id] = True
-
-        ctx.voice_client.stop()
-        await ctx.voice_client.disconnect()
-
-        embed = discord.Embed(title="Stopped playback and cleared the queue.", color=discord.Color.red())
-        embed.set_image(url="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNDE0ZjczNjE2ZjE3YjdjNDQ1YTRkMTUxYTk4MzdiYTVhNDA1NzY2NCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/wKnceDnhLqX70U9a2V/giphy.gif")
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+        bot.stopped = True
+        embed = discord.Embed(title="Stop ⏹️", description="Player stopped and disconnected.", color=discord.Color.red())
+        embed.set_thumbnail(url="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNDE0ZjczNjE2ZjE3YjdjNDQ1YTRkMTUxYTk4MzdiYTVhNDA1NzY2NCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/wKnceDnhLqX70U9a2V/giphy.gif")
         await ctx.send(embed=embed)
+    else:
+        await ctx.send(embed=discord.Embed(title="Stop ⏹️", description="⚠️ No audio is playing.", color=discord.Color.red()))
+
+
+@bot.command()
+async def skip(ctx):
+    voice_client = ctx.voice_client
+
+    if voice_client and voice_client.is_playing():
+        bot.skip = True
+        embed = discord.Embed(title="Skip ⏭️", description="Skipping the current song.", color=discord.Color.gold())
+        embed.set_thumbnail(url="https://media4.giphy.com/media/nVE8OaIGkUhf7rkieR/giphy.gif?cid=ecf05e47bfmg4e4soz8txfcuqmq7h97v58n9xqakuyqnhxrk&ep=v1_gifs_search&rid=giphy.gif&ct=g")
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(embed=discord.Embed(title="Skip ⏭️", description="⚠️ No audio is playing.", color=discord.Color.red()))
 
 
 @bot.command()
 async def pause(ctx):
-    if ctx.voice_client and ctx.voice_client.is_playing():
-        ctx.voice_client.pause()
-        embed = discord.Embed(title="Paused playback.", color=discord.Color.orange())
-        embed.set_image(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
+    voice_client = ctx.voice_client
+
+    if voice_client and voice_client.is_playing():
+        bot.paused = True
+        embed = discord.Embed(title="Pause ⏸️", description="Playback paused.", color=discord.Color.blue())
+        embed.set_thumbnail(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
         await ctx.send(embed=embed)
+    else:
+        await ctx.send(embed=discord.Embed(title="Pause ⏸️", description="⚠️ No audio is playing.", color=discord.Color.red()))
 
 
 @bot.command()
 async def resume(ctx):
-    if ctx.voice_client and ctx.voice_client.is_paused():
-        ctx.voice_client.resume()
-        embed = discord.Embed(title="Resumed playback.", color=discord.Color.green())
-        embed.set_image(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
+    voice_client = ctx.voice_client
+
+    if voice_client and voice_client.is_paused():
+        bot.paused = False
+        embed = discord.Embed(title="Resume ▶️", description="Playback resumed.", color=discord.Color.green())
+        embed.set_thumbnail(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
         await ctx.send(embed=embed)
-
-
-bot.remove_command('help')
-
-
-@bot.command()
-async def help(ctx):
-    embed = discord.Embed(title="Bot Commands", color=discord.Color.blue())
-    embed.set_thumbnail(url="https://media.tenor.com/AcrJynkiNzcAAAAM/cmd-command.gif")
-    embed.add_field(name="!play <url> 🎶", value="Play songs from the provided URL", inline=False)
-    embed.add_field(name="!skip ⏩", value="Skip the current song", inline=False)
-    embed.add_field(name="!stop ⏹️", value="Stop playback and clear the queue", inline=False)
-    embed.add_field(name="!pause ⏸️", value="Pause playback", inline=False)
-    embed.add_field(name="!resume ▶️", value="Resume playback", inline=False)
-    embed.set_footer(text="Made by Hima")
-    await ctx.send(embed=embed)
-
+    else:
+        await ctx.send(embed=discord.Embed(title="Resume ▶️", description="Audio is not paused.", color=discord.Color.red()))
 
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        embed = discord.Embed(title="Oops! 😓", description="That's an invalid command. Please use !help to view all available commands.", color=discord.Color.red())
+        embed = discord.Embed(title="Oops! 😓", description="⚠️ That's an invalid command. Please use !help to view all available commands.", color=discord.Color.red())
         await ctx.send(embed=embed)
 
+bot.remove_command('help')
+@bot.command()
+async def help(ctx):
+    embed = discord.Embed(title="Bot Commands", description="List of available commands", color=discord.Color.blue())
+    embed.set_thumbnail(url="https://media.tenor.com/AcrJynkiNzcAAAAM/cmd-command.gif")
+    embed.add_field(name="!play <URL>", value="Plays 🎶 a song or a playlist from YouTube.", inline=False)
+    embed.add_field(name="!stop", value="Stops🛑 the player and disconnects from the voice channel.", inline=False)
+    embed.add_field(name="!skip", value="Skips ⏭️ the current song.", inline=False)
+    embed.add_field(name="!pause", value="Pauses ⏸️ the playback.", inline=False)
+    embed.add_field(name="!resume", value="Resumes ▶️ the playback.", inline=False)
+    embed.add_field(name="!Help", value="Show this message.", inline=False)
+    embed.set_footer(text="Bot created by Hima Azab 💕")
+    await ctx.send(embed=embed)
 
-# Run the bot with your token
-bot.run(os.getenv('BOT_TOKEN'))
+
+bot.run(os.getenv('DISCORD_TOKEN'))

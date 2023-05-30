@@ -60,7 +60,7 @@ Contributions are welcome! If you have any suggestions, improvements, or bug fix
 
 ~2- Fix Playing Wrong Song~
 
-3- Improve stability
+~3- Improve stability~
 
 ~4- Put it on my Could for 24/7 Online~
 
