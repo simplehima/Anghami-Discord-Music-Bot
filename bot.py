@@ -4,10 +4,7 @@ from discord.ext import commands
 import yt_dlp
 from discord import Intents
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import requests
 import asyncio
 from dotenv import load_dotenv
 
@@ -32,37 +29,20 @@ ytdl_options = {
 yt_dlp.utils.bug_reports_message = lambda: ''
 queues = {}
 
+
 class Song:
     def __init__(self, url):
         self.info = yt_dlp.YoutubeDL(ytdl_options).extract_info(f'ytsearch:{url}', download=False)['entries'][0]
         self.title = self.info['title']
         self.duration = self.info['duration']
 
+
 def get_song_titles(url):
-    # Configure the WebDriver (use the appropriate driver for your browser)
-    driver = webdriver.Chrome()  # Example: using Chrome
-
-    # Navigate to the URL
-    driver.get(url)
-
-    # Wait for the playlist content to load
-    try:
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, '.container-table100'))
-        )
-    except TimeoutError:
-        print("Timed out waiting for page to load")
-        driver.quit()
-        return []
-
-    # Get the page source
-    html = driver.page_source
-
-    # Close the browser
-    driver.quit()
+    # Send a GET request to the URL
+    response = requests.get(url)
 
     # Parse the HTML using Beautiful Soup
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(response.text, "html.parser")
 
     # Find the container element with the specified class
     container = soup.find(class_='container-table100')
@@ -74,8 +54,11 @@ def get_song_titles(url):
     song_titles = [span.text.strip() for span in song_spans if 'E' not in span.text]
 
     return song_titles
+
+
 # Add a global variable to store the stop flag for each guild
 stop_flags = {}
+
 
 @bot.command()
 async def play(ctx, url):
@@ -136,14 +119,16 @@ async def play(ctx, url):
             while ctx.voice_client and (ctx.voice_client.is_playing() or ctx.voice_client.is_paused()):
                 await asyncio.sleep(1)
 
+
 @bot.command()
 async def skip(ctx):
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
-        
+
         embed = discord.Embed(title="Skipped the current song.", color=discord.Color.red())
         embed.set_image(url="https://media4.giphy.com/media/nVE8OaIGkUhf7rkieR/giphy.gif?cid=ecf05e47bfmg4e4soz8txfcuqmq7h97v58n9xqakuyqnhxrk&ep=v1_gifs_search&rid=giphy.gif&ct=g")
         await ctx.send(embed=embed)
+
 
 @bot.command()
 async def stop(ctx):
@@ -156,10 +141,11 @@ async def stop(ctx):
 
         ctx.voice_client.stop()
         await ctx.voice_client.disconnect()
-        
+
         embed = discord.Embed(title="Stopped playback and cleared the queue.", color=discord.Color.red())
-        embed.set_image(url="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjNmNmExOWUzNGFmNmI4OGE5NjYwYzczMzU4NjkxNDA1NmZiY2YzZSZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/LX8sm3UPwCpjxleARL/giphy.gif")
+        embed.set_image(url="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNDE0ZjczNjE2ZjE3YjdjNDQ1YTRkMTUxYTk4MzdiYTVhNDA1NzY2NCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/wKnceDnhLqX70U9a2V/giphy.gif")
         await ctx.send(embed=embed)
+
 
 @bot.command()
 async def pause(ctx):
@@ -169,6 +155,7 @@ async def pause(ctx):
         embed.set_image(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
         await ctx.send(embed=embed)
 
+
 @bot.command()
 async def resume(ctx):
     if ctx.voice_client and ctx.voice_client.is_paused():
@@ -176,8 +163,11 @@ async def resume(ctx):
         embed = discord.Embed(title="Resumed playback.", color=discord.Color.green())
         embed.set_image(url="https://cdn.dribbble.com/users/2065859/screenshots/7134385/media/280bfd85736f25fca6d8447c46fb0d5e.gif")
         await ctx.send(embed=embed)
-        
+
+
 bot.remove_command('help')
+
+
 @bot.command()
 async def help(ctx):
     embed = discord.Embed(title="Bot Commands", color=discord.Color.blue())
@@ -190,11 +180,13 @@ async def help(ctx):
     embed.set_footer(text="Made by Hima")
     await ctx.send(embed=embed)
 
+
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         embed = discord.Embed(title="Oops! 😓", description="That's an invalid command. Please use !help to view all available commands.", color=discord.Color.red())
         await ctx.send(embed=embed)
+
 
 # Run the bot with your token
 bot.run(os.getenv('BOT_TOKEN'))

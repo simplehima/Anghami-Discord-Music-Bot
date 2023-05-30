@@ -15,14 +15,14 @@ Anghami Bot is a Discord bot that allows you to play songs from Anghami and crea
 - `discord.py` library (`pip install discord.py`)
 - `yt-dlp` library (`pip install yt-dlp`)
 - `pip install python-dotenv`
-- Chrome WebDriver (or WebDriver compatible with your browser)
+- ~Chrome WebDriver (or WebDriver compatible with your browser)~
 
 ## Installation
 
 1. Clone this repository or download the source code.
 2. Install the required dependencies mentioned in the "Requirements" section.
-3. Download the appropriate WebDriver for your browser and place it in the project directory.
-4. Place `'YOUR_BOT_TOKEN'` in the `.env` file with your actual Discord bot token.
+   ~3. Download the appropriate WebDriver for your browser and place it in the project directory.~
+3. Place `'YOUR_BOT_TOKEN'` in the `.env` file with your actual Discord bot token.
 
 ## Usage
 
@@ -34,7 +34,7 @@ Anghami Bot is a Discord bot that allows you to play songs from Anghami and crea
 
 Contributions are welcome! If you have any suggestions, improvements, or bug fixes, feel free to open an issue or submit a pull request.
 
-## Bot Update to Beta 2.5
+## Bot Update to Version 3.0
 
 ### Changelog
 
@@ -52,21 +52,25 @@ Contributions are welcome! If you have any suggestions, improvements, or bug fix
 
 7- Add Support for dotenv
 
+8- Fix Playing Wrong Song [by extracting artist name]
+
 ### ToDo List
 
 ~1- Add More Commands { Pause, Resume, Help }~
 
-2- Fix Playing Wrong Song
+~2- Fix Playing Wrong Song~
 
 3- Improve stability
 
-4- Put it on my Could for 24/7 Online
+~4- Put it on my Could for 24/7 Online~
 
 ~5- Improve discord embed message for commands~
 
 ~6- Add .env~
 
 7- Support for docker
+
+8- support for slash commands
 
 ## Disclaimer
 
